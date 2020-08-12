@@ -27,6 +27,7 @@ from pyflink.common.typeinfo import PickledBytesTypeInfo, TypeInformation
 from pyflink.datastream.checkpoint_config import CheckpointConfig
 from pyflink.datastream.checkpointing_mode import CheckpointingMode
 from pyflink.datastream.data_stream import DataStream
+from pyflink.datastream.functions import SourceFunction
 from pyflink.datastream.state_backend import _from_j_state_backend
 from pyflink.datastream.time_characteristic import TimeCharacteristic
 from pyflink.java_gateway import get_gateway
@@ -446,6 +447,38 @@ class StreamExecutionEnvironment(object):
         j_stream_exection_environment = gateway.jvm.org.apache.flink.streaming.api.environment\
             .StreamExecutionEnvironment.getExecutionEnvironment()
         return StreamExecutionEnvironment(j_stream_exection_environment)
+
+    def add_source(self, source_func: SourceFunction, source_name: str = 'Custom Source',
+                   type_info: TypeInformation = None) -> 'DataStream':
+        """
+        Adds a data source to the streaming topology.
+
+        :param source_func: the user defined function.
+        :param source_name: name of the data source. Optional.
+        :param type_info: type of the returned stream. Optional.
+        :return: the data stream constructed.
+        """
+        j_type_info = type_info.get_java_type_info() if type_info is not None else None
+        j_data_stream = self._j_stream_execution_environment.addSource(source_func
+                                                                       .get_java_function(),
+                                                                       source_name,
+                                                                       j_type_info)
+        return DataStream(j_data_stream=j_data_stream)
+
+    def read_text_file(self, file_path: str, charset_name: str = "UTF-8") -> DataStream:
+        """
+        Reads the given file line-by-line and creates a DataStream that contains a string with the
+        contents of each such line. The charset with the given name will be used to read the files.
+
+        Note that this interface is not fault tolerant that is supposed to be used for test purpose.
+
+        :param file_path: The path of the file, as a URI (e.g., "file:///some/local/file" or
+                          "hdfs://host:port/file/path")
+        :param charset_name: The name of the character set used to read the file.
+        :return: The DataStream that represents the data read from the given file as text lines.
+        """
+        return DataStream(self._j_stream_execution_environment
+                          .readTextFile(file_path, charset_name))
 
     def from_collection(self, collection: List[Any],
                         type_info: TypeInformation = None) -> DataStream:
